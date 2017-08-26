@@ -1,0 +1,4 @@
+
+CFLAGS+=-Wno-error=pointer-sign -DLSB_FIRST=0
+COMPONENT_ADD_INCLUDEDIRS := .
+

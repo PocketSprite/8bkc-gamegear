@@ -158,7 +158,7 @@ void vidRenderOverlay() {
 spi_flash_mmap_handle_t hrom;
 
 //Runs the emu until user quits it in some way
-int smsemuRun(char *rom, int loadState) {
+int smsemuRun(char *rom, char *statefile, int loadState) {
 	int frameno;
 	int tickCnt, lastTickCnt;
 	int x;
@@ -195,6 +195,15 @@ int smsemuRun(char *rom, int loadState) {
 
 	kchal_sound_start(SNDRATE, 2048);
 	sms_system_init(SNDRATE);
+	if (loadState) {
+		appfs_handle_t fd=appfsOpen(statefile);
+		if (fd<0) {
+			printf("Couldn't load state %s\n", statefile);
+		} else {
+			sms_system_load_state(fd);
+			appfsClose(fd);
+		}
+	}
 	printf("Sound buffer: %d samples, enabled=%d.\n", snd.bufsize, snd.enabled);
 	lastTickCnt=0;
 	while(ret==EMU_RUN_CONT) {
@@ -202,6 +211,7 @@ int smsemuRun(char *rom, int loadState) {
 			int showMenu=readJs();
 			if (showMenu) {
 				ret=menuShow();
+				if (ret!=EMU_RUN_CONT) break;
 			}
 			sms_frame(0);
 			showOverlay=false;
@@ -218,6 +228,19 @@ int smsemuRun(char *rom, int loadState) {
 		dframe=0;
 		lastTickCnt=tickCnt;
 	}
+
+	if (ret==EMU_RUN_NEWROM || ret==EMU_RUN_POWERDOWN || ret==EMU_RUN_EXIT) {
+		//Save state
+		appfs_handle_t fd;
+		esp_err_t r=appfsCreateFile(statefile, 1<<16, &fd);
+		if (r!=ESP_OK) {
+			printf("Couldn't create save state %s: %d\n", statefile, r);
+		} else {
+			sms_system_save_state(fd);
+			appfsClose(fd);
+		}
+	}
+
 	sms_system_shutdown();
 	kchal_sound_stop();
 
@@ -257,26 +280,10 @@ void emuThread(void *arg) {
 			nvs_set_str(nvsh, "rom", "");
 			//Run emu
 			kchal_sound_mute(0);
-			ret=smsemuRun(rom, loadState);
+			ret=smsemuRun(rom, statefile, loadState);
 			emuRan=1;
 		} else {
 			ret=EMU_RUN_NEWROM;
-		}
-
-		if (ret==EMU_RUN_NEWROM || ret==EMU_RUN_POWERDOWN || ret==EMU_RUN_EXIT) {
-			//Saving state only makes sense when emu actually ran...
-			if (emuRan) {
-				//Save state
-/*
-				appfs_handle_t fd;
-				r=appfsCreateFile(statefile, 1<<16, &fd);
-				if (r!=ESP_OK) {
-					printf("Couldn't create save state %s: %d\n", statefile, r);
-				} else {
-					savestate(fd);
-				}
-*/
-			}
 		}
 
 		if (ret==EMU_RUN_NEWROM) {

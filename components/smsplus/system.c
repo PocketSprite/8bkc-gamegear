@@ -124,6 +124,9 @@ void sms_system_reset(void)
 }
 
 
+#if 0
+//reimplemented in system-esp32.c
+
 void sms_system_save_state(void *fd)
 {
     /* Save VDP context */
@@ -245,6 +248,7 @@ void sms_system_load_state(void *fd)
 #endif
     }
 }
+#endif
 
 void ym2413_write(int chip, int offset, int data)
 {

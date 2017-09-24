@@ -8,8 +8,12 @@
 #include "nvs_flash.h"
 #include "esp_partition.h"
 #include "8bkc-hal.h"
+#include "8bkc-ugui.h"
+#include "8bkcgui-widgets.h"
 #include "appfs.h"
 #include "shared.h"
+#include "menu.h"
+#include "smsplus-main.h"
 
 #define SMS_FPS 60
 #define SNDRATE 22050
@@ -17,7 +21,7 @@
 
 static SemaphoreHandle_t renderSem;
 
-static void readJs() {
+static int readJs() {
 	//Convert buttons to SMS buttons
 	int b=kchal_get_keys();
 	int smsButtons=0, smsSystem=0;
@@ -33,11 +37,38 @@ static void readJs() {
 //	if (b&KC_BTN_UP) smsSystem|=INPUT_HARD_RESET;
 	input.pad[0]=smsButtons;
 	input.system=smsSystem;
+	return (b&KC_BTN_POWER);
 }
 
 
 
 uint16_t oledBuf[80*64];
+uint32_t overlay[80*64];
+int showOverlay=false;
+
+int addOverlayPixel(uint16_t p, uint32_t ov) {
+	int or, og, ob, a;
+	int br, bg, bb;
+	int r,g,b;
+	br=((p>>11)&0x1f)<<3;
+	bg=((p>>5)&0x3f)<<2;
+	bb=((p>>0)&0x1f)<<3;
+
+	a=(ov>>24)&0xff;
+	//hack: Always show background darker
+	a=(a/2)+128;
+
+	ob=(ov>>16)&0xff;
+	og=(ov>>8)&0xff;
+	or=(ov>>0)&0xff;
+
+	r=(br*(256-a))+(or*a);
+	g=(bg*(256-a))+(og*a);
+	b=(bb*(256-a))+(ob*a);
+
+	return ((r>>(3+8))<<11)+((g>>(2+8))<<5)+((b>>(3+8))<<0);
+}
+
 
 int dframe;
 
@@ -47,6 +78,7 @@ static void lcdWriteSMSFrame() {
 	int rgb[3];
 	uint8_t *data=bitmap.data;
 	uint16_t *p=oledBuf;
+	uint32_t *ov=overlay;
 	for (int y=0; y<192; y+=3) {
 		for (int x=0; x<240; x+=3) {
 			for (int sp=0; sp<3; sp++) {
@@ -56,6 +88,7 @@ static void lcdWriteSMSFrame() {
 				rgb[sp]/=3;
 			}
 			uint16_t col=((rgb[0]>>3)<<11)+((rgb[1]>>2)<<5)+((rgb[2]>>3)<<0);
+			if (showOverlay) col=addOverlayPixel(col, *ov++);
 			*p++=(col>>8)|((col&0xff)<<8);
 		}
 	}
@@ -67,13 +100,15 @@ static void lcdWriteSMSFrame() {
 static void lcdWriteGGFrame() {
 	uint8_t *data=bitmap.data;
 	uint16_t *p=oledBuf;
+	uint32_t *ov=overlay;
 	uint32_t pal[2][32];
 	for (int x=0; x<32; x++) {
 		pal[0][x]=((bitmap.pal.color[x][0]>>3)<<11)+((bitmap.pal.color[x][1]>>3)<<5);
 		pal[1][x]=((bitmap.pal.color[x][1]>>3)<<5)+((bitmap.pal.color[x][2]>>3)<<0);
 	}
 
-	for (int y=24; y<128+24; y+=2) {
+	int t=0;
+	for (int y=24; y<144+24; y+=2) {
 		for (int x=48; x<160+48; x+=2) {
 			uint32_t c=0;
 			c+=pal[0][data[(x)+((y)*256)]&PIXEL_MASK];
@@ -81,8 +116,13 @@ static void lcdWriteGGFrame() {
 			c+=pal[0][data[(x)+((y+1)*256)]&PIXEL_MASK];
 			c+=pal[1][data[(x+1)+((y+1)*256)]&PIXEL_MASK];
 			c/=4;
-//			uint16_t col=((rgb[0]>>3)<<11)+((rgb[1]>>2)<<5)+((rgb[2]>>3)<<0);
+			if (showOverlay) c=addOverlayPixel(c, *ov++);
 			*p++=(c>>8)|((c&0xff)<<8);
+		}
+		t++;
+		if (t==4) {
+			y++;
+			t=0;
 		}
 	}
 	kchal_send_fb(oledBuf);
@@ -106,11 +146,23 @@ void sms_system_load_sram(void) {
 }
 
 
+uint32_t *vidGetOverlayBuf() {
+	return overlay;
+}
+
+void vidRenderOverlay() {
+	showOverlay=true;
+	xSemaphoreGive(renderSem);
+}
+
 spi_flash_mmap_handle_t hrom;
 
-void smsemuRun(char *rom) {
+//Runs the emu until user quits it in some way
+int smsemuRun(char *rom, int loadState) {
 	int frameno;
+	int tickCnt, lastTickCnt;
 	int x;
+	int ret=EMU_RUN_CONT;
 	uint8_t sbuf[(SNDRATE/SMS_FPS)];
 	sms.use_fm=0;
 	sms.country=TYPE_OVERSEAS;
@@ -123,16 +175,18 @@ void smsemuRun(char *rom) {
 	sms.sram=malloc(0x8000);
 	
 	int sz;
+	//We don't do paging here: that means we do not support GG/SMS cartridges >2MiB
 	if (appfsExists(rom)) {
 		appfs_handle_t fd=appfsOpen(rom);
 		appfsEntryInfo(fd, NULL, &sz);
 		esp_err_t err=appfsMmap(fd, 0, sz, (const void**)&cart.rom, SPI_FLASH_MMAP_DATA, &hrom);
 		if (err!=ESP_OK) {
 			printf("Error: mmap for rom failed\n");
+			goto exitemu;
 		}
 	} else {
 		printf("Error: %s does not exist.\n", rom);
-		return;
+		goto exitemu;
 	}
 	
 	cart.pages=(sz/0x4000);
@@ -143,10 +197,14 @@ void smsemuRun(char *rom) {
 	sms_system_init(SNDRATE);
 	printf("Sound buffer: %d samples, enabled=%d.\n", snd.bufsize, snd.enabled);
 	lastTickCnt=0;
-	while(1) {
+	while(ret==EMU_RUN_CONT) {
 		for (frameno=0; frameno<SMS_FPS; frameno++) {
-			readJs();
+			int showMenu=readJs();
+			if (showMenu) {
+				ret=menuShow();
+			}
 			sms_frame(0);
+			showOverlay=false;
 			xSemaphoreGive(renderSem);
 			for (x=0; x<(SNDRATE/SMS_FPS); x++) {
 				sbuf[x]=((snd.buffer[0][x]+snd.buffer[1][x])/512)+128;
@@ -156,14 +214,94 @@ void smsemuRun(char *rom) {
 		tickCnt=xTaskGetTickCount();
 		if (tickCnt==lastTickCnt) tickCnt++;
 		printf("fps=%d disp=%d\n", (SMS_FPS*100)/(tickCnt-lastTickCnt), dframe);
+		printf("Free mem: %d\n", xPortGetFreeHeapSize());
 		dframe=0;
 		lastTickCnt=tickCnt;
 	}
+	sms_system_shutdown();
+	kchal_sound_stop();
+
+exitemu:
+	free(bitmap.data);
+	free(sms.sram);
+	return ret;
 }
 
 void emuThread(void *arg) {
-	smsemuRun("Sonic2.gg");
+	char rom[128]="";
+	char statefile[130];
+	nvs_handle nvsh;
+	//Let other threads start
+	vTaskDelay(200/portTICK_PERIOD_MS);
+	esp_err_t r=nvs_open("smsplus", NVS_READWRITE, &nvsh);
+	if (r!=ESP_OK) {
+		printf("nvs_open err %d\n", r);
+	}
+
+	int ret;
+	int loadState=1;
+
+	unsigned int size=sizeof(rom);
+	r=nvs_get_str(nvsh, "rom", rom, &size);
+
+	while(1) {
+		int emuRan=0;
+		if (strlen(rom)>0 && appfsExists(rom)) {
+			//Figure out name for statefile
+			strcpy(statefile, rom);
+			char *dot=strrchr(statefile, '.');
+			if (dot==NULL) dot=statefile+strlen(statefile);
+			strcpy(dot, ".state");
+			printf("State file: %s\n", statefile);
+			//Kill rom str so when emu crashes, we don't try to load again
+			nvs_set_str(nvsh, "rom", "");
+			//Run emu
+			kchal_sound_mute(0);
+			ret=smsemuRun(rom, loadState);
+			emuRan=1;
+		} else {
+			ret=EMU_RUN_NEWROM;
+		}
+
+		if (ret==EMU_RUN_NEWROM || ret==EMU_RUN_POWERDOWN || ret==EMU_RUN_EXIT) {
+			//Saving state only makes sense when emu actually ran...
+			if (emuRan) {
+				//Save state
+/*
+				appfs_handle_t fd;
+				r=appfsCreateFile(statefile, 1<<16, &fd);
+				if (r!=ESP_OK) {
+					printf("Couldn't create save state %s: %d\n", statefile, r);
+				} else {
+					savestate(fd);
+				}
+*/
+			}
+		}
+
+		if (ret==EMU_RUN_NEWROM) {
+			kcugui_init();
+			appfs_handle_t f=kcugui_filechooser("*.gg,*.sms", "SELECT ROM", NULL, NULL);
+			const char *rrom;
+			appfsEntryInfo(f, &rrom, NULL);
+			strncpy(rom, rrom, sizeof(rom));
+			printf("Selected ROM %s\n", rom);
+			kcugui_deinit();
+			loadState=1;
+		} else if (ret==EMU_RUN_RESET) {
+			loadState=0;
+		} else if (ret==EMU_RUN_POWERDOWN) {
+			nvs_set_str(nvsh, "rom", rom);
+			break;
+		} else if (ret==EMU_RUN_EXIT) {
+			printf("Exiting to chooser...\n");
+			kchal_exit_to_chooser();
+		}
+	}
+	kchal_power_down();
 }
+
+
 
 void smsemuStart() {
 	renderSem=xSemaphoreCreateBinary();

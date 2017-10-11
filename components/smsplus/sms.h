@@ -25,6 +25,15 @@ typedef struct
 
 /* Global data */
 extern t_sms sms;
+extern z80_t *Z80_Context;
+extern int z80_ICount;
+
+extern unsigned char *cpu_readmap[8];
+extern unsigned char *cpu_writemap[8];
+void cpu_writemem16(int address, int data);
+void cpu_writeport(int port, int data);
+int cpu_readport(int port);
+
 
 /* Function prototypes */
 void sms_frame(int skip_render);

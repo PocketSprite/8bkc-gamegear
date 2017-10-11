@@ -3,6 +3,14 @@
 
 /* SMS context */
 t_sms sms;
+z80_t *Z80_Context=NULL;
+static z80_t z80;
+int z80_ICount;
+static int extra_cycles=0;
+
+unsigned char *cpu_readmap[8];
+unsigned char *cpu_writemap[8];
+
 
 /* Run the virtual console emulation for one frame */
 void sms_frame(int skip_render)
@@ -20,8 +28,7 @@ void sms_frame(int skip_render)
         {
             sms.paused = 1;
 
-            z80_set_nmi_line(ASSERT_LINE);
-            z80_set_nmi_line(CLEAR_LINE);
+			z80_nmi(Z80_Context, 0);
         }
     }
     else
@@ -40,7 +47,13 @@ void sms_frame(int skip_render)
         if(!skip_render) render_line(vdp.line);
 
         /* Run the Z80 for a line */
-        z80_execute(227);
+		z80_ICount=227-extra_cycles;
+        while(z80_ICount>0) {
+			if (sms.irq) z80_interrupt(Z80_Context, 0);
+			z80_ICount-=z80_do_opcode(Z80_Context);
+			//printf("%d\n", z80_ICount);
+		}
+		extra_cycles=-z80_ICount;
     }
 
     /* Update the emulated sound stream */
@@ -79,6 +92,8 @@ void sms_frame(int skip_render)
 
 void sms_init(void)
 {
+	Z80_Context=&z80;
+	z80_init(Z80_Context);
     cpu_reset();
     sms_reset();
 }
@@ -122,8 +137,8 @@ void sms_reset(void)
 /* Reset Z80 emulator */
 void cpu_reset(void)
 {
-    z80_reset(0);
-    z80_set_irq_callback(sms_irq_callback);
+    z80_reset(Z80_Context);
+    //z80_set_irq_callback(sms_irq_callback);
 }
 
 

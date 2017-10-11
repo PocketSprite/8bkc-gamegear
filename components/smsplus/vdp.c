@@ -141,7 +141,7 @@ int vdp_ctrl_r(void)
     if(sms.irq == 1)
     {
         sms.irq = 0;
-        z80_set_irq_line(0, CLEAR_LINE);
+        //z80_set_irq_line(0, CLEAR_LINE);
     }
 
     /* Return the old status flags */
@@ -245,7 +245,7 @@ void vdp_run(void)
         if((vdp.status & 0x40) && (vdp.reg[0] & 0x10))
         {
             sms.irq = 1;
-            z80_set_irq_line(0, ASSERT_LINE);
+            //z80_set_irq_line(0, ASSERT_LINE);
         }
     }
     else
@@ -255,7 +255,7 @@ void vdp_run(void)
         if((vdp.line < 0xE0) && (vdp.status & 0x80) && (vdp.reg[1] & 0x20))
         {
             sms.irq = 1;
-            z80_set_irq_line(0, ASSERT_LINE);
+            //z80_set_irq_line(0, ASSERT_LINE);
         }
     }
 }

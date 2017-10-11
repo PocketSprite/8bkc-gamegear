@@ -25,8 +25,8 @@ void sms_system_save_state(void *gfd)
     appfs_replace_fwrite(&sms, sizeof(t_sms), 1, fd);
 
     /* Save Z80 context */
-    appfs_replace_fwrite(Z80_Context, sizeof(Z80_Regs), 1, fd);
-    appfs_replace_fwrite(&after_EI, sizeof(int), 1, fd);
+    appfs_replace_fwrite(Z80_Context, sizeof(z80_t), 1, fd);
+//    appfs_replace_fwrite(&after_EI, sizeof(int), 1, fd);
 
 #if 0
     /* Save YM2413 registers */
@@ -56,8 +56,8 @@ void sms_system_load_state(void *gfd)
     appfs_replace_fread(&sms, sizeof(t_sms), 1, fd);
 
     /* Load Z80 context */
-    appfs_replace_fread(Z80_Context, sizeof(Z80_Regs), 1, fd);
-    appfs_replace_fread(&after_EI, sizeof(int), 1, fd);
+    appfs_replace_fread(Z80_Context, sizeof(z80_t), 1, fd);
+//    appfs_replace_fread(&after_EI, sizeof(int), 1, fd);
 
 #if 0
     /* Load YM2413 registers */
@@ -68,7 +68,7 @@ void sms_system_load_state(void *gfd)
     appfs_replace_fread(&sn[0], sizeof(t_SN76496), 1, fd);
 
     /* Restore callbacks */
-    z80_set_irq_callback(sms_irq_callback);
+    //z80_set_irq_callback(sms_irq_callback);
 
     cpu_readmap[0] = cart.rom + 0x0000; /* 0000-3FFF */
     cpu_readmap[1] = cart.rom + 0x2000;

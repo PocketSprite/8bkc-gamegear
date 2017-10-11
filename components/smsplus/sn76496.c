@@ -81,7 +81,7 @@ void SN76496Write(int chip,int data)
 }
 
 
-void SN76496Update(int chip,INT16 *buffer[2],int length, unsigned char mask)
+void SN76496Update(int chip,int16_t *buffer[2],int length, unsigned char mask)
 {
     int i, j;
     int buffer_index = 0;

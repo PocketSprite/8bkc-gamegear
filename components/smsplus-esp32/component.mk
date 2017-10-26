@@ -9,6 +9,12 @@
 
 COMPONENT_ADD_INCLUDEDIRS := .
 
+COMPILEDATE:=\"$(shell date "+%d %b %Y")\"
+GITREV:=\"$(shell git rev-parse HEAD | cut -b 1-10)\"
+
+CFLAGS += -O3 
+CFLAGS += -DCOMPILEDATE="$(COMPILEDATE)" -DGITREV="$(GITREV)"
+
 COMPONENTS_EXTRA_CLEAN := graphics.inc graphics.rgba
 menu.o: graphics.inc
 

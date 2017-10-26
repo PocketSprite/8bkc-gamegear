@@ -14,6 +14,7 @@
 #include "shared.h"
 #include "menu.h"
 #include "smsplus-main.h"
+#include "ugui.h"
 
 #define SMS_FPS 60
 #define SNDRATE 22050
@@ -190,8 +191,12 @@ int smsemuRun(char *rom, char *statefile, int loadState) {
 	}
 	
 	cart.pages=(sz/0x4000);
-	cart.type=TYPE_GG;
-	printf("Mmap: Cart has %d pages.\n", cart.pages);
+	cart.type=TYPE_SMS;
+	if (strcasecmp(rom+strlen(rom)-3, ".gg")==0) {
+		cart.type=TYPE_GG;
+	}
+
+	printf("Mmap: Cart is for %s and has %d pages.\n", (cart.type==TYPE_GG)?"GameGear":"SMS", cart.pages);
 
 	kchal_sound_start(SNDRATE, 2048);
 	sms_system_init(SNDRATE);
@@ -250,6 +255,33 @@ exitemu:
 	return ret;
 }
 
+static void debug_screen() {
+	kcugui_cls();
+	UG_FontSelect(&FONT_6X8);
+	UG_SetForecolor(C_WHITE);
+	UG_PutString(0, 0, "INFO");
+	UG_SetForecolor(C_YELLOW);
+	UG_PutString(0, 16, "SMSPlus");
+	UG_PutString(0, 24, "Gitrev");
+	UG_SetForecolor(C_WHITE);
+	UG_PutString(0, 32, GITREV);
+	UG_SetForecolor(C_YELLOW);
+	UG_PutString(0, 40, "Compiled");
+	UG_SetForecolor(C_WHITE);
+	UG_PutString(0, 48, COMPILEDATE);
+	kcugui_flush();
+
+	while (kchal_get_keys()&KC_BTN_SELECT) vTaskDelay(100/portTICK_RATE_MS);
+	while (!(kchal_get_keys()&KC_BTN_SELECT)) vTaskDelay(100/portTICK_RATE_MS);
+}
+
+static int fccallback(int button, char **glob, char **desc, void *usrptr) {
+	if (button & KC_BTN_POWER) kchal_power_down();
+	if (button & KC_BTN_SELECT) debug_screen();
+	return 0;
+}
+
+
 void emuThread(void *arg) {
 	char rom[128]="";
 	char statefile[130];
@@ -288,7 +320,7 @@ void emuThread(void *arg) {
 
 		if (ret==EMU_RUN_NEWROM) {
 			kcugui_init();
-			appfs_handle_t f=kcugui_filechooser("*.gg,*.sms", "SELECT ROM", NULL, NULL);
+			appfs_handle_t f=kcugui_filechooser("*.gg,*.sms", "SELECT ROM", fccallback, NULL);
 			const char *rrom;
 			appfsEntryInfo(f, &rrom, NULL);
 			strncpy(rom, rrom, sizeof(rom));

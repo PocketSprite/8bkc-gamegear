@@ -91,12 +91,12 @@ int menuShow() {
 			if (menuItem<0) menuItem=SCN_COUNT-1;
 			scroll=SCROLLSPD;
 		}
-		if ((io&KC_BTN_LEFT) || (io&KC_BTN_RIGHT)) {
+		if ((newIo&KC_BTN_LEFT) || (newIo&KC_BTN_RIGHT)) {
 			int v=128;
 			if (menuItem==SCN_VOLUME) v=kchal_get_volume();
 			if (menuItem==SCN_BRIGHT) v=kchal_get_contrast();
-			if (io&KC_BTN_LEFT) v-=4;
-			if (io&KC_BTN_RIGHT) v+=4;
+			if (newIo&KC_BTN_LEFT) v-=2;
+			if (newIo&KC_BTN_RIGHT) v+=2;
 			if (v<0) v=0;
 			if (v>255) v=255;
 			if (menuItem==SCN_VOLUME) {

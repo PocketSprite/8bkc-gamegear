@@ -103,6 +103,8 @@ void sms_system_shutdown(void)
 {
     if(snd.enabled)
     {
+		free(snd.buffer[0]);
+		free(snd.buffer[1]);
 //        OPLL_delete(opll);
 //        OPLL_close();
     }

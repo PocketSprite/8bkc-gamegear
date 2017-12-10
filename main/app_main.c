@@ -17,7 +17,7 @@
 void app_main()
 {
 	kchal_init();
-	nvs_flash_init();
+//	nvs_flash_init();
 	
 	smsemuStart();
 }

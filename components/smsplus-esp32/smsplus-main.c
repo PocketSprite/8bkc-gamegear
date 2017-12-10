@@ -156,10 +156,9 @@ void vidRenderOverlay() {
 	xSemaphoreGive(renderSem);
 }
 
-spi_flash_mmap_handle_t hrom;
-
 //Runs the emu until user quits it in some way
 int smsemuRun(char *rom, char *statefile, int loadState) {
+	spi_flash_mmap_handle_t hrom=NULL;
 	int frameno;
 	int tickCnt, lastTickCnt;
 	int x;
@@ -250,6 +249,7 @@ int smsemuRun(char *rom, char *statefile, int loadState) {
 	kchal_sound_stop();
 
 exitemu:
+	spi_flash_munmap(hrom);
 	free(bitmap.data);
 	free(sms.sram);
 	return ret;

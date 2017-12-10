@@ -10,5 +10,3 @@
 
 CFLAGS += -O3 -Wno-error=strict-aliasing 
 
-
-include $(IDF_PATH)/make/component_common.mk

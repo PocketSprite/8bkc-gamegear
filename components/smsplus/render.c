@@ -85,7 +85,7 @@ uint8 *getCache(int tile, int attr) {
 			printf("Eek, tile cache overflow\n");
 			//Crap, out of cache. Kill a tile.
 			vramMarkTileDirty(cacheKillPtr++);
-			if (cacheKillPtr>=512) cacheKillPtr=0;
+			if (cacheKillPtr>=CACHEDTILES) cacheKillPtr=0;
 			i=freePtr;
 		}
 	} while (cacheStoreUsed[i]);
@@ -237,6 +237,7 @@ void render_reset(void)
     /* Invalidate pattern cache */
 	for (i=0; i<512*4; i++) cachePtr[i]=-1;
 	for (i=0; i<512; i++) vramMarkTileDirty(i);
+	for (i=0; i<CACHEDTILES; i++) cacheStoreUsed[i]=0;
 
     /* Set up viewport size */
     if(IS_GG)

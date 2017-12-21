@@ -68,6 +68,7 @@ static void menuShowSnapshotting(uint32_t *overlay) {
 //Show in-game menu reachable by pressing the power button
 int menuShow() {
 	int io, newIo, oldIo=0;
+	int powerReleased=0;
 	int menuItem=0;
 	int prevItem=0;
 	int scroll=0;
@@ -126,8 +127,13 @@ int menuShow() {
 				return EMU_RUN_EXIT;
 			}
 		}
+		if (io&KC_BTN_POWER_LONG) {
+			menuShowSnapshotting(overlay);
+			return EMU_RUN_POWERDOWN;
+		}
 
-		if (io&KC_BTN_START) {
+		if (!(io&KC_BTN_POWER)) powerReleased=1;
+		if (io&KC_BTN_START || (powerReleased && (io&KC_BTN_POWER))) {
 			kchal_sound_mute(0);
 			return EMU_RUN_CONT;
 		}

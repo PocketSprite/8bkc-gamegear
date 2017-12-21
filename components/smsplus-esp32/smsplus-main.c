@@ -215,6 +215,8 @@ int smsemuRun(char *rom, char *statefile, int loadState) {
 			int showMenu=readJs();
 			if (showMenu) {
 				ret=menuShow();
+				//wait till power button is released
+				while(readJs()) vTaskDelay(10);
 				if (ret!=EMU_RUN_CONT) break;
 			}
 			sms_frame(0);
@@ -288,16 +290,13 @@ void emuThread(void *arg) {
 	nvs_handle nvsh;
 	//Let other threads start
 	vTaskDelay(200/portTICK_PERIOD_MS);
-	esp_err_t r=nvs_open("smsplus", NVS_READWRITE, &nvsh);
-	if (r!=ESP_OK) {
-		printf("nvs_open err %d\n", r);
-	}
+	nvsh=kchal_get_app_nvsh();
 
 	int ret;
 	int loadState=1;
 
 	unsigned int size=sizeof(rom);
-	r=nvs_get_str(nvsh, "rom", rom, &size);
+	nvs_get_str(nvsh, "rom", rom, &size);
 
 	while(1) {
 		int emuRan=0;

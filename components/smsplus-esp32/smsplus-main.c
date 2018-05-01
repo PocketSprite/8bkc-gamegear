@@ -15,6 +15,8 @@
 #include "menu.h"
 #include "smsplus-main.h"
 #include "ugui.h"
+#include "powerbtn_menu.h"
+
 
 #define SMS_FPS 60
 #define SNDRATE 22050
@@ -278,7 +280,12 @@ static void debug_screen() {
 }
 
 static int fccallback(int button, char **glob, char **desc, void *usrptr) {
-	if (button & KC_BTN_POWER) kchal_power_down();
+	if (button & KC_BTN_POWER) {
+		int r=powerbtn_menu_show(kcugui_get_fb());
+		//No need to save state or whatever; we're not in a game.
+		if (r==POWERBTN_MENU_EXIT) kchal_exit_to_chooser();
+		if (r==POWERBTN_MENU_POWERDOWN) kchal_power_down();
+	}
 	if (button & KC_BTN_SELECT) debug_screen();
 	return 0;
 }

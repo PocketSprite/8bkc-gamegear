@@ -158,6 +158,8 @@ void vidRenderOverlay() {
 	xSemaphoreGive(renderSem);
 }
 
+#define STATE_TMP_FILE "__smsplus_state.tmp"
+
 //Runs the emu until user quits it in some way
 int smsemuRun(char *rom, char *statefile, int loadState) {
 	spi_flash_mmap_handle_t hrom=NULL;
@@ -240,12 +242,19 @@ int smsemuRun(char *rom, char *statefile, int loadState) {
 	if (ret==EMU_RUN_NEWROM || ret==EMU_RUN_POWERDOWN || ret==EMU_RUN_EXIT) {
 		//Save state
 		appfs_handle_t fd;
-		esp_err_t r=appfsCreateFile(statefile, 1<<16, &fd);
+		esp_err_t r;
+		r=appfsCreateFile(STATE_TMP_FILE, 1<<16, &fd);
+		if (r!=ESP_OK) {
+			//Not enough room... delete old state file and retry
+			appfsDeleteFile(statefile);
+			r=appfsCreateFile(STATE_TMP_FILE, 1<<16, &fd);
+		}
 		if (r!=ESP_OK) {
 			printf("Couldn't create save state %s: %d\n", statefile, r);
 		} else {
 			sms_system_save_state(fd);
 			appfsClose(fd);
+			appfsRename(STATE_TMP_FILE, statefile);
 		}
 	}
 
@@ -326,7 +335,7 @@ void emuThread(void *arg) {
 
 		if (ret==EMU_RUN_NEWROM) {
 			kcugui_init();
-			appfs_handle_t f=kcugui_filechooser("*.gg,*.sms", "SELECT ROM", fccallback, NULL);
+			appfs_handle_t f=kcugui_filechooser("*.gg,*.sms", "SELECT ROM", fccallback, NULL, 0);
 			const char *rrom;
 			appfsEntryInfo(f, &rrom, NULL);
 			strncpy(rom, rrom, sizeof(rom));

@@ -514,7 +514,7 @@ void render_obj(int line)
             if(vdp.reg[1] & 0x01)
             {
                 int x;
-				ctp=getCache((n&0x1ff)+((line - yp) >> 3), (n>>9)&3);
+				ctp=getCache((n&0x1ff)+((line - yp) >> 4), (n>>9)&3);
                 uint8 *cache_ptr = (uint8 *)&ctp[(((line - yp) >> 1) << 3)];
 
                 /* Draw sprite line */

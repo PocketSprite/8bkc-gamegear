@@ -359,6 +359,6 @@ void emuThread(void *arg) {
 
 void smsemuStart() {
 	renderSem=xSemaphoreCreateBinary();
-	xTaskCreatePinnedToCore(&emuThread, "emuThread", 1024*8, NULL, 5, NULL, 0);
-	xTaskCreatePinnedToCore(&lcdThread, "lcdThread", 1024*4, NULL, 5, NULL, 1);
+	xTaskCreatePinnedToCore(&emuThread, "emuThread", 1024*16, NULL, 5, NULL, 0);
+	xTaskCreatePinnedToCore(&lcdThread, "lcdThread", 1024*8, NULL, 5, NULL, 1);
 }

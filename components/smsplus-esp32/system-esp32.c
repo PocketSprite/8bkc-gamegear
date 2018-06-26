@@ -35,6 +35,9 @@ void sms_system_save_state(void *gfd)
 
     /* Save SN76489 context */
     appfs_replace_fwrite(&sn[0], sizeof(t_SN76496), 1, fd);
+
+    /* Save sram context */
+    appfs_replace_fwrite(sms.sram, 0x8000, 1, fd);
 }
 
 
@@ -43,7 +46,9 @@ void sms_system_load_state(void *gfd)
 	int fd=(int)gfd;
 	size_t loc=0;
     int i;
+#if 0
     uint8 reg[0x40];
+#endif
 
     /* Initialize everything */
     cpu_reset();
@@ -52,8 +57,14 @@ void sms_system_load_state(void *gfd)
     /* Load VDP context */
     appfs_replace_fread(&vdp, sizeof(t_vdp), 1, fd);
 
+    /* SMS context contains two pointers we need to save. The load overwrites them otherwise */
+    uint8_t *old_sram=sms.sram;
+    uint8_t *old_dummy=sms.dummy;
     /* Load SMS context */
     appfs_replace_fread(&sms, sizeof(t_sms), 1, fd);
+    /* Restore ptrs */
+    sms.sram=old_sram;
+    sms.dummy=old_dummy;
 
     /* Load Z80 context */
     appfs_replace_fread(Z80_Context, sizeof(z80_t), 1, fd);
@@ -66,6 +77,9 @@ void sms_system_load_state(void *gfd)
 
     /* Load SN76489 context */
     appfs_replace_fread(&sn[0], sizeof(t_SN76496), 1, fd);
+
+    /* Load sram */
+    appfs_replace_fread(sms.sram, 0x8000, 1, fd);
 
     /* Restore callbacks */
     //z80_set_irq_callback(sms_irq_callback);

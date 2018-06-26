@@ -17,7 +17,6 @@
 #include "ugui.h"
 #include "powerbtn_menu.h"
 
-
 #define SMS_FPS 60
 #define SNDRATE 22050
 
@@ -260,8 +259,9 @@ int smsemuRun(char *rom, char *statefile, int loadState) {
 
 	sms_system_shutdown();
 	kchal_sound_stop();
-
 exitemu:
+
+	vTaskDelay(40/portTICK_RATE_MS); //make sure render thread is done
 	spi_flash_munmap(hrom);
 	free(bitmap.data);
 	free(sms.sram);
@@ -359,6 +359,6 @@ void emuThread(void *arg) {
 
 void smsemuStart() {
 	renderSem=xSemaphoreCreateBinary();
-	xTaskCreatePinnedToCore(&emuThread, "emuThread", 1024*16, NULL, 5, NULL, 0);
-	xTaskCreatePinnedToCore(&lcdThread, "lcdThread", 1024*8, NULL, 5, NULL, 1);
+	xTaskCreatePinnedToCore(&emuThread, "emuThread", 1024*8, NULL, 5, NULL, 0);
+	xTaskCreatePinnedToCore(&lcdThread, "lcdThread", 1024*4, NULL, 5, NULL, 1);
 }

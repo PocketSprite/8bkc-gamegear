@@ -173,6 +173,20 @@ int menuShow() {
 			if (v>255) v=255;
 			renderGfx(overlay, 14, 25+16, 14, 193, (v*60)/256, 4);
 		}
+
+		// draw empty battery cell
+		renderGfx(overlay, KC_SCREEN_W-16, 0, 0, 316, 16, 7);
+		
+		// fill in the battery with appropriate color
+		int batPct = kchal_get_bat_pct();
+		if (batPct < 20) renderGfx(overlay, KC_SCREEN_W-15, 1, 17, 317, (batPct*12)/100, 5);
+		else if (batPct < 50) renderGfx(overlay, KC_SCREEN_W-15, 1, 33, 317, (batPct*12)/100, 5);
+		else renderGfx(overlay, KC_SCREEN_W-15, 1, 49, 317, (batPct*12)/100, 5);
+		
+		// add lightning bolt icon if applicable
+		if (kchal_get_chg_status() > 0) {
+			renderGfx(overlay, KC_SCREEN_W-11, 0, 64, 316, 6, 8);
+		}
 		
 		if (doRefresh) {
 			vidRenderOverlay();
